@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VILDE GJØR</title>
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      background: #000;
+      color: #fff;
+      font-family: 'Courier Prime', 'Courier New', monospace;
+      min-height: 100vh;
+      padding: 48px 24px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 8vw, 3.5rem);
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #fff;
+      padding-bottom: 16px;
+      margin-bottom: 40px;
+      user-select: none;
+    }
+
+    .rad {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 4px;
+      animation: fadeIn 0.15s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-6px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .bullet {
+      color: #fff;
+      font-size: 1.2rem;
+      line-height: 1.87rem;
+      flex-shrink: 0;
+      opacity: 0.6;
+      user-select: none;
+    }
+
+    textarea {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid transparent;
+      color: #fff;
+      font-family: 'Courier Prime', 'Courier New', monospace;
+      font-size: 1.1rem;
+      line-height: 1.7;
+      width: 100%;
+      resize: none;
+      outline: none;
+      overflow: hidden;
+      caret-color: #fff;
+      -webkit-appearance: none;
+      height: 1.87rem;
+    }
+
+    textarea:focus {
+      border-bottom: 1px solid #444;
+    }
+
+    textarea::placeholder {
+      color: #333;
+    }
+
+    #status {
+      position: fixed;
+      bottom: 16px;
+      right: 20px;
+      font-size: 0.75rem;
+      color: #333;
+      transition: color 0.4s;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>VILDE GJØR</h1>
+  <div id="liste"></div>
+  <div id="status">●</div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey:            "DIN_API_KEY",
+      authDomain:        "DIN_PROJECT.firebaseapp.com",
+      databaseURL:       "https://DIN_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId:         "DIN_PROJECT",
+      storageBucket:     "DIN_PROJECT.firebasestorage.app",
+      messagingSenderId: "DIN_SENDER_ID",
+      appId:             "DIN_APP_ID"
+    };
+
+    const app    = initializeApp(firebaseConfig);
+    const db     = getDatabase(app);
+    const dbRef  = ref(db, "gjore/items");
+    const liste  = document.getElementById("liste");
+    const status = document.getElementById("status");
+
+    let fjerntOppdatert = false;
+
+    function autosize(ta) {
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
+    }
+
+    function hentAlt() {
+      return [...liste.querySelectorAll("textarea")].map(ta => ta.value);
+    }
+
+    let lagreTimeout;
+    function lagre() {
+      clearTimeout(lagreTimeout);
+      lagreTimeout = setTimeout(() => {
+        status.textContent = "↑"; status.style.color = "#888";
+        fjerntOppdatert = true;
+        set(dbRef, hentAlt())
+          .then(() => { status.textContent = "●"; status.style.color = "#333"; })
+          .catch(() => { status.textContent = "✕"; status.style.color = "#a00"; });
+      }, 400);
+    }
+
+    function leggTilRad(tekst = "", etterElement = null, fokus = false) {
+      const rad = document.createElement("div");
+      rad.className = "rad";
+
+      const bul = document.createElement("span");
+      bul.className = "bullet";
+      bul.textContent = "•";
+
+      const ta = document.createElement("textarea");
+      ta.rows = 1;
+      ta.value = tekst;
+      ta.placeholder = "skriv her…";
+
+      ta.addEventListener("input", () => {
+        autosize(ta);
+        lagre();
+      });
+
+      ta.addEventListener("keydown", (e) => {
+        const rader = [...liste.querySelectorAll("textarea")];
+        const idx   = rader.indexOf(ta);
+
+        if (e.key === "Enter") {
+          e.preventDefault();
+          leggTilRad("", rad, true);
+          lagre();
+        }
+
+        if (e.key === "Backspace" && ta.value === "" && rader.length > 1) {
+          e.preventDefault();
+          const forrige = rader[idx - 1] || rader[idx + 1];
+          rad.remove();
+          if (forrige) {
+            forrige.focus();
+            forrige.setSelectionRange(forrige.value.length, forrige.value.length);
+          }
+          lagre();
+        }
+      });
+
+      rad.appendChild(bul);
+      rad.appendChild(ta);
+
+      if (etterElement) {
+        etterElement.after(rad);
+      } else {
+        liste.appendChild(rad);
+      }
+
+      autosize(ta);
+      if (fokus) ta.focus();
+
+      return ta;
+    }
+
+    function byggListe(items) {
+      liste.innerHTML = "";
+      const arr = (items && items.length) ? items : [""];
+      arr.forEach(t => leggTilRad(t));
+    }
+
+    // Vis alltid ett kulepunkt med en gang mens Firebase laster
+    leggTilRad("", null, true);
+
+    onValue(dbRef, (snap) => {
+      if (fjerntOppdatert) { fjerntOppdatert = false; return; }
+      const data = snap.val();
+      if (!data) return;
+      const arr = Array.isArray(data) ? data : Object.values(data);
+      if (arr.length) byggListe(arr);
+      status.textContent = "●"; status.style.color = "#333";
+    });
+
+  </script>
+</body>
+</html>
