@@ -101,13 +101,13 @@
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     const firebaseConfig = {
-      apiKey:            "DIN_API_KEY",
-      authDomain:        "DIN_PROJECT.firebaseapp.com",
-      databaseURL:       "https://DIN_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId:         "DIN_PROJECT",
-      storageBucket:     "DIN_PROJECT.firebasestorage.app",
-      messagingSenderId: "DIN_SENDER_ID",
-      appId:             "DIN_APP_ID"
+      apiKey:            "AIzaSyBMKmRnduSca8OwRUyqxqoptroD5ISHIlA",
+      authDomain:        "vildegjore.firebaseapp.com",
+      databaseURL:       "https://vildegjore-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId:         "vildegjore",
+      storageBucket:     "vildegjore.firebasestorage.app",
+      messagingSenderId: "304789921468",
+      appId:             "1:304789921468:web:8b7a04ac0a964d06ea3ab9"
     };
 
     const app    = initializeApp(firebaseConfig);
@@ -116,7 +116,7 @@
     const liste  = document.getElementById("liste");
     const status = document.getElementById("status");
 
-    let fjerntOppdatert = false;
+    let sistLagret = null;
 
     function autosize(ta) {
       ta.style.height = "auto";
@@ -132,8 +132,9 @@
       clearTimeout(lagreTimeout);
       lagreTimeout = setTimeout(() => {
         status.textContent = "↑"; status.style.color = "#888";
-        fjerntOppdatert = true;
-        set(dbRef, hentAlt())
+        const data = hentAlt();
+        sistLagret = JSON.stringify(data);
+        set(dbRef, data)
           .then(() => { status.textContent = "●"; status.style.color = "#333"; })
           .catch(() => { status.textContent = "✕"; status.style.color = "#a00"; });
       }, 400);
@@ -204,11 +205,12 @@
     leggTilRad("", null, true);
 
     onValue(dbRef, (snap) => {
-      if (fjerntOppdatert) { fjerntOppdatert = false; return; }
       const data = snap.val();
       if (!data) return;
       const arr = Array.isArray(data) ? data : Object.values(data);
-      if (arr.length) byggListe(arr);
+      // Ikke overskriv hvis det er det vi nettopp lagret
+      if (sistLagret && JSON.stringify(arr) === sistLagret) return;
+      byggListe(arr);
       status.textContent = "●"; status.style.color = "#333";
     });
 
